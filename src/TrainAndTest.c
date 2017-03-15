@@ -24,8 +24,6 @@ static double weights[NUM_FEATURES] = { 0 };
 // Helpers
 static int sample = 0;
 static int feature = 0;
-static int layer = 0;
-static double sum = 0;
 
 // Normalisation
 void normalise() {
@@ -47,8 +45,7 @@ void normalise() {
     labelNormals[sample] = (labels[sample] - 'a') / (labelCap - 'a');
 
     for (feature = 0; feature < totalFeatures; feature++) {
-      sum = model[sample][feature] / featureCaps[feature];
-      modelNormals[sample][feature] = sum;
+      modelNormals[sample][feature] = model[sample][feature] / featureCaps[feature];
     }
   }
 }
@@ -57,8 +54,8 @@ void normalise() {
 void learn() {
   int i;
   int error = 1;
-  int maxIterations = 100;
-  double alpha = (double) 100 / 1000;
+  int maxIterations = 25;
+  double alpha = 0.025;
 
   for (i = 0; error == 1 && i < maxIterations; i++) {
     error = 0;
