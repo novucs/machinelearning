@@ -1,11 +1,3 @@
-//
-//  TrainAndTest.h
-//  MLCoursework
-//
-//  Created by Jim Smith on 06/02/2017.
-//  Copyright © 2017 Jim SmithJim Smith. All rights reserved.
-//
-
 #ifndef TrainAndTest_h
 #define TrainAndTest_h
 

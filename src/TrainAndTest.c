@@ -7,16 +7,16 @@
 #define OUTPUT_LAYER_SIZE 1
 
 static int totalSamples = 0;
-static int totalFeatures = NUM_FEATURES;
+static int totalFeatures = 0;
 
 // Models
-static double model[NUM_TRAINING_SAMPLES][NUM_FEATURES] = { 0 };
-static double modelNormals[NUM_TRAINING_SAMPLES][NUM_FEATURES] = { 0 };
+static double model[NUM_SAMPLES][NUM_FEATURES] = { 0 };
+static double modelNormals[NUM_SAMPLES][NUM_FEATURES] = { 0 };
 static double featureCaps[NUM_FEATURES] = { 0 };
 
 // Labels
-static char labels[NUM_TRAINING_SAMPLES] = { 0 };
-static double labelNormals[NUM_TRAINING_SAMPLES] = { 0 };
+static char labels[NUM_SAMPLES] = { 0 };
+static double labelNormals[NUM_SAMPLES] = { 0 };
 static double labelCap;
 
 // Weights
@@ -24,12 +24,12 @@ static double weights1[NUM_FEATURES][HIDDEN_LAYER_SIZE] = { 0 };
 static double weights2[HIDDEN_LAYER_SIZE][OUTPUT_LAYER_SIZE] = { 0 };
 
 // Neurons
-static double activation2[NUM_TRAINING_SAMPLES][HIDDEN_LAYER_SIZE] = { 0 };
-static double activity2[NUM_TRAINING_SAMPLES][HIDDEN_LAYER_SIZE] = { 0 };
-static double activation3[NUM_TRAINING_SAMPLES][OUTPUT_LAYER_SIZE] = { 0 };
+static double activation2[NUM_SAMPLES][HIDDEN_LAYER_SIZE] = { 0 };
+static double activity2[NUM_SAMPLES][HIDDEN_LAYER_SIZE] = { 0 };
+static double activation3[NUM_SAMPLES][OUTPUT_LAYER_SIZE] = { 0 };
 
 // Estimation
-double yHat[NUM_TRAINING_SAMPLES][OUTPUT_LAYER_SIZE] = { 0 };
+double yHat[NUM_SAMPLES][OUTPUT_LAYER_SIZE] = { 0 };
 
 // Normalisation
 void normalise() {
