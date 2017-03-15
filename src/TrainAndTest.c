@@ -3,8 +3,7 @@
 #include "TrainAndTest.h"
 
 // Totals
-#define HIDDEN_LAYER_SIZE 3
-#define OUTPUT_LAYER_SIZE 1
+#define HIDDEN_LAYERS 3
 
 static int totalSamples = 0;
 static int totalFeatures = 0;
@@ -17,26 +16,29 @@ static double featureCaps[NUM_FEATURES] = { 0 };
 // Labels
 static char labels[NUM_SAMPLES] = { 0 };
 static double labelNormals[NUM_SAMPLES] = { 0 };
-static double labelCap;
+static char labelCap;
 
 // Weights
-static double weights1[NUM_FEATURES][HIDDEN_LAYER_SIZE] = { 0 };
-static double weights2[HIDDEN_LAYER_SIZE][OUTPUT_LAYER_SIZE] = { 0 };
+static double weights1[NUM_FEATURES][HIDDEN_LAYERS] = { 0 };
+static double weights2[HIDDEN_LAYERS] = { 0 };
 
 // Neurons
-static double activation2[NUM_SAMPLES][HIDDEN_LAYER_SIZE] = { 0 };
-static double activity2[NUM_SAMPLES][HIDDEN_LAYER_SIZE] = { 0 };
-static double activation3[NUM_SAMPLES][OUTPUT_LAYER_SIZE] = { 0 };
+static double activation2[NUM_SAMPLES][HIDDEN_LAYERS] = { 0 };
+static double activity2[NUM_SAMPLES][HIDDEN_LAYERS] = { 0 };
+static double activation3[NUM_SAMPLES] = { 0 };
 
 // Estimation
-double yHat[NUM_SAMPLES][OUTPUT_LAYER_SIZE] = { 0 };
+static double yHat[NUM_SAMPLES] = { 0 };
+
+// Helpers
+static int sample = 0;
+static int feature = 0;
+static int layer = 0;
+static int sum = 0;
 
 // Normalisation
 void normalise() {
-  int sample;
-  int feature;
-  int sum;
-
+  // Get label and feature max values
   for (sample = 0; sample < totalSamples; sample++) {
     if (labels[sample] > labelCap) {
       labelCap = labels[sample];
@@ -49,6 +51,7 @@ void normalise() {
     }
   }
 
+  // Divide each label and feature by either max values
   for (sample = 0; sample < totalSamples; sample++) {
     labelNormals[sample] = (labels[sample] - 'a') / (labelCap - 'a');
 
@@ -61,86 +64,84 @@ void normalise() {
 
 // Forward propagation
 void forward() {
-  int sample;
-  int feature;
-  int hidden_layer;
-  int output_layer;
-  int sum;
-
   // Dot product of model and weights1
   for (sample = 0; sample < totalSamples; sample++) {
     for (feature = 0; feature < totalFeatures; feature++) {
-      for (hidden_layer = 0; hidden_layer < HIDDEN_LAYER_SIZE; hidden_layer++) {
-        sum = modelNormals[sample][feature] * weights1[feature][hidden_layer];
-        activation2[sample][hidden_layer] += sum;
+      for (layer = 0; layer < HIDDEN_LAYERS; layer++) {
+        sum = modelNormals[sample][feature] * weights1[feature][layer];
+        activation2[sample][layer] += sum;
       }
     }
   }
 
   // Sigmoid activation2 for activity2
   for (sample = 0; sample < totalSamples; sample++) {
-    for (hidden_layer = 0; hidden_layer < HIDDEN_LAYER_SIZE; hidden_layer++) {
-      sum = 1 / (1 + pow(M_E, -(activation2[sample][hidden_layer])));
-      activity2[sample][hidden_layer] = sum;
+    for (layer = 0; layer < HIDDEN_LAYERS; layer++) {
+      sum = 1 / (1 + pow(M_E, -(activation2[sample][layer])));
+      activity2[sample][layer] = sum;
     }
   }
 
   // Dot product of activity2 and weights2
   for (sample = 0; sample < totalSamples; sample++) {
-    for (hidden_layer = 0; hidden_layer < HIDDEN_LAYER_SIZE; hidden_layer++) {
-      for (output_layer = 0; output_layer < OUTPUT_LAYER_SIZE; output_layer++) {
-        sum = activity2[sample][hidden_layer] * weights2[hidden_layer][output_layer];
-        activation3[sample][output_layer] += sum;
-      }
+    for (layer = 0; layer < HIDDEN_LAYERS; layer++) {
+      sum = activity2[sample][layer] * weights2[layer];
+      activation3[sample] += sum;
     }
   }
 
   // Sigmoid activation3 for yHat
   for (sample = 0; sample < totalSamples; sample++) {
-    for (output_layer = 0; output_layer < OUTPUT_LAYER_SIZE; output_layer++) {
-      sum = 1 / (1 + pow(M_E, -(activation3[sample][output_layer])));
-      yHat[sample][output_layer] = sum;
-    }
+    sum = 1 / (1 + pow(M_E, -(activation3[sample])));
+    yHat[sample] = sum;
   }
+}
+
+double costFunction() {
+  forward();
+  double cost = 0;
+  return cost;
 }
 
 int train(double** trainingSamples, char* trainingLabels, int numSamples,
           int numFeatures) {
-  int returnval = 1;
-  int sample;
-  int feature;
-
   // Sanity checking.
   if (numFeatures > NUM_FEATURES || numSamples > NUM_TRAINING_SAMPLES) {
-    fprintf(stdout, "error: called train with data set larger than spaced allocated to store it");
-    returnval = 0;
+    printf("Too many features and/or samples provided\n");
+    return 0;
   }
 
-  if (returnval == 1) {
-    // Store the labels and the feature values.
-    totalSamples = numSamples;
-    totalFeatures = numFeatures;
+  // Store the labels and the feature values.
+  totalSamples = numSamples;
+  totalFeatures = numFeatures;
 
-    for (sample = 0; sample < numSamples; sample++) {
-      labels[sample] = trainingLabels[sample];
+  for (sample = 0; sample < numSamples; sample++) {
+    labels[sample] = trainingLabels[sample];
 
-      for (feature = 0; feature < numFeatures; feature++) {
-        model[sample][feature] = trainingSamples[sample][feature];
-      }
+    for (feature = 0; feature < numFeatures; feature++) {
+      model[sample][feature] = trainingSamples[sample][feature];
     }
+  }
 
-    printf("Data stored locally\n");
+  printf("Data stored locally\n");
+
+  normalise();
+  forward();
+
+  return 1;
+}
+
+char predictLabel(double* sample, int numFeatures) {
+  totalSamples = 1;
+  totalFeatures = numFeatures;
+
+  for (feature = 0; feature < totalFeatures; feature++) {
+    model[0][feature] = sample[feature];
   }
 
   normalise();
   forward();
 
-  return returnval;
-}
-
-char predictLabel(double* sample, int numFeatures) {
-  // This is a silly trivial test function obviously you need to replace this
-  // with something that uses the model you built in your train() function.
-  char prediction = 'c';
+  char prediction = (yHat[0] * (labelCap + 'a')) + 'a';
   return prediction;
 }
