@@ -1,15 +1,105 @@
+#include <math.h>
 #include <stdio.h>
 #include "TrainAndTest.h"
 
-// Declare this array as static but make it available to any function in this
-// file in case we want to store the training examples  and use them later.
-static double myModel[NUM_TRAINING_SAMPLES][NUM_FEATURES];
+// Totals
+#define HIDDEN_LAYER_SIZE 3
+#define OUTPUT_LAYER_SIZE 1
 
-// Even if each item in the training set is from a diffferent class we know how
-// many there are.
-static char myModelLabels[NUM_TRAINING_SAMPLES];
+static int totalSamples = 0;
+static int totalFeatures = NUM_FEATURES;
 
-static int trainingSetSize = 0;
+// Models
+static double model[NUM_TRAINING_SAMPLES][NUM_FEATURES] = { 0 };
+static double modelNormals[NUM_TRAINING_SAMPLES][NUM_FEATURES] = { 0 };
+static double featureCaps[NUM_FEATURES] = { 0 };
+
+// Labels
+static char labels[NUM_TRAINING_SAMPLES] = { 0 };
+static double labelNormals[NUM_TRAINING_SAMPLES] = { 0 };
+static double labelCap;
+
+// Weights
+static double weights1[NUM_FEATURES][HIDDEN_LAYER_SIZE] = { 0 };
+static double weights2[HIDDEN_LAYER_SIZE][OUTPUT_LAYER_SIZE] = { 0 };
+
+// Neurons
+static double activation2[NUM_TRAINING_SAMPLES][HIDDEN_LAYER_SIZE] = { 0 };
+static double activity2[NUM_TRAINING_SAMPLES][HIDDEN_LAYER_SIZE] = { 0 };
+static double activation3[NUM_TRAINING_SAMPLES][OUTPUT_LAYER_SIZE] = { 0 };
+
+// Normalisation
+void normalise() {
+  int sample;
+  int feature;
+  int sum;
+
+  for (sample = 0; sample < totalSamples; sample++) {
+    if (labels[sample] > labelCap) {
+      labelCap = labels[sample];
+    }
+
+    for (feature = 0; feature < totalFeatures; feature++) {
+      if (model[sample][feature] > featureCaps[feature]) {
+        featureCaps[feature] = model[sample][feature];
+      }
+    }
+  }
+
+  for (sample = 0; sample < totalSamples; sample++) {
+    labelNormals[sample] = (labels[sample] - 'a') / (labelCap - 'a');
+
+    for (feature = 0; feature < totalFeatures; feature++) {
+      sum = model[sample][feature] / featureCaps[feature];
+      modelNormals[sample][feature] = sum;
+    }
+  }
+}
+
+// Forward propagation
+void forward(double (*yHat)[OUTPUT_LAYER_SIZE]) {
+  int sample;
+  int feature;
+  int hidden_layer;
+  int output_layer;
+  int sum;
+
+  // Dot product of model and weights1
+  for (sample = 0; sample < totalSamples; sample++) {
+    for (feature = 0; feature < totalFeatures; feature++) {
+      for (hidden_layer = 0; hidden_layer < HIDDEN_LAYER_SIZE; hidden_layer++) {
+        sum = modelNormals[sample][feature] * weights1[feature][hidden_layer];
+        activation2[sample][hidden_layer] += sum;
+      }
+    }
+  }
+
+  // Sigmoid activation2 for activity2
+  for (sample = 0; sample < totalSamples; sample++) {
+    for (hidden_layer = 0; hidden_layer < HIDDEN_LAYER_SIZE; hidden_layer++) {
+      sum = 1 / (1 + pow(M_E, -(activation2[sample][hidden_layer])));
+      activity2[sample][hidden_layer] = sum;
+    }
+  }
+
+  // Dot product of activity2 and weights2
+  for (sample = 0; sample < totalSamples; sample++) {
+    for (hidden_layer = 0; hidden_layer < HIDDEN_LAYER_SIZE; hidden_layer++) {
+      for (output_layer = 0; output_layer < OUTPUT_LAYER_SIZE; output_layer++) {
+        sum = activity2[sample][hidden_layer] * weights2[hidden_layer][output_layer];
+        activation3[sample][output_layer] += sum;
+      }
+    }
+  }
+
+  // Sigmoid activation3 for yHat
+  for (sample = 0; sample < totalSamples; sample++) {
+    for (output_layer = 0; output_layer < OUTPUT_LAYER_SIZE; output_layer++) {
+      sum = 1 / (1 + pow(M_E, -(activation3[sample][output_layer])));
+      yHat[sample][output_layer] = sum;
+    }
+  }
+}
 
 int train(double** trainingSamples, char* trainingLabels, int numSamples,
           int numFeatures) {
@@ -17,48 +107,31 @@ int train(double** trainingSamples, char* trainingLabels, int numSamples,
   int sample;
   int feature;
 
-  // Clean the model because C leaves whatever is in the memory.
-  for (sample = 0; sample < NUM_TRAINING_SAMPLES; sample++) {
-    for (feature = 0; feature < NUM_FEATURES; feature++) {
-      myModel[sample][feature] = 0.0;
-    }
-  }
-
   // Sanity checking.
   if (numFeatures > NUM_FEATURES || numSamples > NUM_TRAINING_SAMPLES) {
     fprintf(stdout, "error: called train with data set larger than spaced allocated to store it");
     returnval = 0;
   }
 
-  // This is a silly trivial train()_ function.
-  fprintf(stdout, "no ML algorithm implemented yet\n");
-
-  // Make a simple copy of the data we are being passed but don't do anything
-  // with it I'm just giving you this for the sake of people less familiar with
-  // pointers etc.
-
   if (returnval == 1) {
     // Store the labels and the feature values.
-    trainingSetSize = numSamples;
-    int index, feature;
+    totalSamples = numSamples;
+    totalFeatures = numFeatures;
 
-    for (index = 0; index < numSamples; index++) {
-      myModelLabels[index] = trainingLabels[index];
+    for (sample = 0; sample < numSamples; sample++) {
+      labels[sample] = trainingLabels[sample];
 
       for (feature = 0; feature < numFeatures; feature++) {
-        myModel[index][feature] = trainingSamples[index][feature];
+        model[sample][feature] = trainingSamples[sample][feature];
       }
     }
 
-    fprintf(stdout, "data stored locally \n");
+    printf("Data stored locally\n");
   }
 
-  // Now you could do whatever you like with the data. For example, you could
-  // populate some rules etc. You were given pseudocode in semester 1 to do this
-  // you could also normalise the data to remove scaling effects if you want to
-  // use something like a MLP or kNN just remember that anything that you want
-  // to acess in your predictLabel() function needs to be declared static at the
-  // top of this file - as I have done for the "myModel" and myModelLabels data.
+  normalise();
+  double yHat[NUM_TRAINING_SAMPLES][OUTPUT_LAYER_SIZE] = { 0 };
+  forward(yHat);
 
   return returnval;
 }

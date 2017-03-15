@@ -20,4 +20,4 @@ add_executable(machinelearning ${sources})
 # Provide all warning output on compile.
 target_compile_options(machinelearning PUBLIC -Wall -Wno-unknown-pragmas)
 
-target_link_libraries(machinelearning)
+target_link_libraries(machinelearning m)
