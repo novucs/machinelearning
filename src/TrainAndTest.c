@@ -14,7 +14,8 @@ static int trainingSetSize = 0;
 int train(double** trainingSamples, char* trainingLabels, int numSamples,
           int numFeatures) {
   int returnval = 1;
-  int sample, feature;
+  int sample;
+  int feature;
 
   // Clean the model because C leaves whatever is in the memory.
   for (sample = 0; sample < NUM_TRAINING_SAMPLES; sample++) {
