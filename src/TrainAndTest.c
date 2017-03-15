@@ -28,6 +28,9 @@ static double activation2[NUM_TRAINING_SAMPLES][HIDDEN_LAYER_SIZE] = { 0 };
 static double activity2[NUM_TRAINING_SAMPLES][HIDDEN_LAYER_SIZE] = { 0 };
 static double activation3[NUM_TRAINING_SAMPLES][OUTPUT_LAYER_SIZE] = { 0 };
 
+// Estimation
+double yHat[NUM_TRAINING_SAMPLES][OUTPUT_LAYER_SIZE] = { 0 };
+
 // Normalisation
 void normalise() {
   int sample;
@@ -57,7 +60,7 @@ void normalise() {
 }
 
 // Forward propagation
-void forward(double (*yHat)[OUTPUT_LAYER_SIZE]) {
+void forward() {
   int sample;
   int feature;
   int hidden_layer;
@@ -130,8 +133,7 @@ int train(double** trainingSamples, char* trainingLabels, int numSamples,
   }
 
   normalise();
-  double yHat[NUM_TRAINING_SAMPLES][OUTPUT_LAYER_SIZE] = { 0 };
-  forward(yHat);
+  forward();
 
   return returnval;
 }
