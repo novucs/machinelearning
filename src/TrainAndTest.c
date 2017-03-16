@@ -1,12 +1,14 @@
-#include <math.h>
+#include <stdlib.h>
 #include <stdio.h>
+
 #include "TrainAndTest.h"
 
-// Totals
 #define HIDDEN_LAYERS 3
+#define TOLERANCE 0.01
 
 static int totalSamples = 0;
 static int totalFeatures = 0;
+static int totalLabels = 0;
 
 // Models
 static double model[NUM_SAMPLES][NUM_FEATURES] = { 0 };
@@ -16,7 +18,8 @@ static double featureCaps[NUM_FEATURES] = { 0 };
 // Labels
 static char labels[NUM_SAMPLES] = { 0 };
 static double labelNormals[NUM_SAMPLES] = { 0 };
-static char labelCap;
+static char highestLabel;
+static char lowestLabel;
 
 static double predictions[NUM_SAMPLES] = { 0 };
 static double weights[NUM_FEATURES] = { 0 };
@@ -24,25 +27,13 @@ static double weights[NUM_FEATURES] = { 0 };
 // Helpers
 static int sample = 0;
 static int feature = 0;
+static int label = 0;
 
 // Normalisation
 void normalise() {
-  // Get label and feature max values
-  for (sample = 0; sample < totalSamples; sample++) {
-    if (labels[sample] > labelCap) {
-      labelCap = labels[sample];
-    }
-
-    for (feature = 0; feature < totalFeatures; feature++) {
-      if (model[sample][feature] > featureCaps[feature]) {
-        featureCaps[feature] = model[sample][feature];
-      }
-    }
-  }
-
   // Divide each label and feature by either max values
   for (sample = 0; sample < totalSamples; sample++) {
-    labelNormals[sample] = (labels[sample] - 'a') / (labelCap - 'a');
+    labelNormals[sample] = (double) (labels[sample] - lowestLabel) / (highestLabel - lowestLabel);
 
     for (feature = 0; feature < totalFeatures; feature++) {
       modelNormals[sample][feature] = model[sample][feature] / featureCaps[feature];
@@ -67,7 +58,8 @@ void learn() {
         predictions[sample] += weights[feature] * modelNormals[sample][feature];
       }
 
-      if (predictions[sample] == labelNormals[sample]) {
+      if (predictions[sample] > labelNormals[sample] - TOLERANCE &&
+          predictions[sample] < labelNormals[sample] + TOLERANCE) {
         continue;
       }
 
@@ -101,6 +93,7 @@ int train(double** trainingSamples, char* trainingLabels, int numSamples,
   // Store the labels and the feature values.
   totalSamples = numSamples;
   totalFeatures = numFeatures;
+  totalLabels = numSamples;
 
   for (sample = 0; sample < numSamples; sample++) {
     labels[sample] = trainingLabels[sample];
@@ -111,11 +104,28 @@ int train(double** trainingSamples, char* trainingLabels, int numSamples,
   }
 
   printf("Data stored locally\n");
+  srand(0);
 
-  weights[0] = 0.2;
-  weights[1] = 0.4;
-  weights[2] = 0.6;
-  weights[3] = 0.8;
+  for (feature = 0; feature < NUM_FEATURES; feature++) {
+    weights[feature] = rand() / (double) RAND_MAX;
+  }
+
+  // Get label and feature max values
+  for (sample = 0; sample < totalSamples; sample++) {
+    if (sample == 0 || labels[sample] > highestLabel) {
+      highestLabel = labels[sample];
+    }
+
+    if (sample == 0 || labels[sample] < lowestLabel) {
+      lowestLabel = labels[sample];
+    }
+
+    for (feature = 0; feature < totalFeatures; feature++) {
+      if (model[sample][feature] > featureCaps[feature]) {
+        featureCaps[feature] = model[sample][feature];
+      }
+    }
+  }
 
   normalise();
   learn();
@@ -135,14 +145,24 @@ char predictLabel(double* sample, int numFeatures) {
   predict();
 
   char prediction;
+  double closestLabelNormal;
+  int hasFoundLabel = 0;
+  double difference = 0;
 
-  if (predictions[0] <= 0.25) {
-    prediction = 'a';
-  } else if (predictions[0] <= 0.75) {
-    prediction = 'b';
-  } else {
-    prediction = 'c';
+  for (label = 0; label < totalLabels; label++) {
+    difference = (labelNormals[label] - predictions[0]);
+
+    if (difference < 0) {
+      difference = -difference;
+    }
+
+    if (hasFoundLabel == 0 || closestLabelNormal > difference) {
+      closestLabelNormal = difference;
+      hasFoundLabel = 1;
+      prediction = labels[label];
+    }
   }
+  // printf("%c %f %f %f %f\n", prediction, predictions[0], labelNormals[0], labelNormals[totalLabels / 2], labelNormals[totalLabels - 1]);
 
   return prediction;
 }
