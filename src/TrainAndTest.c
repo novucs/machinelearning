@@ -1,4 +1,3 @@
-#include <stdlib.h>
 #include <stdio.h>
 
 #include "TrainAndTest.h"
@@ -45,7 +44,7 @@ void normalise() {
 void learn() {
   int i;
   int error = 1;
-  int maxIterations = 25;
+  int maxIterations = 1000;
   double alpha = 0.025;
 
   for (i = 0; error == 1 && i < maxIterations; i++) {
@@ -104,10 +103,9 @@ int train(double** trainingSamples, char* trainingLabels, int numSamples,
   }
 
   printf("Data stored locally\n");
-  srand(0);
 
   for (feature = 0; feature < NUM_FEATURES; feature++) {
-    weights[feature] = rand() / (double) RAND_MAX;
+    weights[feature] = ((double) feature / NUM_FEATURES) + 0.1;
   }
 
   // Get label and feature max values
