@@ -44,8 +44,8 @@ void normalise() {
 void learn() {
   int i;
   int error = 1;
-  int maxIterations = 1000;
-  double alpha = 0.025;
+  int maxIterations = 25;
+  double alpha = totalFeatures / (double) 1000;
 
   for (i = 0; error == 1 && i < maxIterations; i++) {
     error = 0;
@@ -65,7 +65,11 @@ void learn() {
       error = 1;
 
       for (feature = 0; feature < totalFeatures; feature++) {
-        weights[feature] += alpha * (labelNormals[sample] - predictions[sample]) * modelNormals[sample][feature];
+        if (labelNormals[sample] - predictions[sample] < 0) {
+          weights[feature] -= alpha * modelNormals[sample][feature];
+        } else {
+          weights[feature] += alpha * modelNormals[sample][feature];
+        }
       }
     }
   }
