@@ -1,13 +1,12 @@
+#include <math.h>
 #include <stdio.h>
-
 #include "TrainAndTest.h"
 
+// Totals
 #define HIDDEN_LAYERS 3
-#define TOLERANCE 0.01
 
 static int totalSamples = 0;
 static int totalFeatures = 0;
-static int totalLabels = 0;
 
 // Models
 static double model[NUM_SAMPLES][NUM_FEATURES] = { 0 };
@@ -17,70 +16,180 @@ static double featureCaps[NUM_FEATURES] = { 0 };
 // Labels
 static char labels[NUM_SAMPLES] = { 0 };
 static double labelNormals[NUM_SAMPLES] = { 0 };
-static char highestLabel;
-static char lowestLabel;
+static char labelCap;
 
-static double predictions[NUM_SAMPLES] = { 0 };
-static double weights[NUM_FEATURES] = { 0 };
+// Weights
+static double weights1[NUM_FEATURES][HIDDEN_LAYERS] = { 0 };
+static double weights2[HIDDEN_LAYERS] = { 0 };
+
+// Neurons
+static double activation2[NUM_SAMPLES][HIDDEN_LAYERS] = { 0 };
+static double activity2[NUM_SAMPLES][HIDDEN_LAYERS] = { 0 };
+static double activation3[NUM_SAMPLES] = { 0 };
+
+// Estimation
+static double yHat[NUM_SAMPLES] = { 0 };
+
+// Costs
+static double costWeights2[HIDDEN_LAYERS] = { 0 };
+static double costWeights1[NUM_FEATURES][HIDDEN_LAYERS] = { 0 };
+static double backpropError2[NUM_SAMPLES][HIDDEN_LAYERS] = { 0 };
+static double backpropError1[NUM_SAMPLES] = { 0 };
 
 // Helpers
 static int sample = 0;
 static int feature = 0;
-static int label = 0;
+static int layer = 0;
+static double sum = 0;
 
 // Normalisation
 void normalise() {
-  // Divide each label and feature by either max values
+  // Get label and feature max values
   for (sample = 0; sample < totalSamples; sample++) {
-    labelNormals[sample] = (double) (labels[sample] - lowestLabel) / (highestLabel - lowestLabel);
+    if (labels[sample] > labelCap) {
+      labelCap = labels[sample];
+    }
 
     for (feature = 0; feature < totalFeatures; feature++) {
-      modelNormals[sample][feature] = model[sample][feature] / featureCaps[feature];
+      if (model[sample][feature] > featureCaps[feature]) {
+        featureCaps[feature] = model[sample][feature];
+      }
+    }
+  }
+
+  // Divide each label and feature by either max values
+  for (sample = 0; sample < totalSamples; sample++) {
+    labelNormals[sample] = (labels[sample] - 'a') / (labelCap - 'a');
+
+    for (feature = 0; feature < totalFeatures; feature++) {
+      sum = model[sample][feature] / featureCaps[feature];
+      modelNormals[sample][feature] = sum;
     }
   }
 }
 
 // Forward propagation
-void learn() {
-  int i;
-  int error = 1;
-  int maxIterations = 25;
-  double alpha = totalFeatures / (double) 1000;
-
-  for (i = 0; error == 1 && i < maxIterations; i++) {
-    error = 0;
-
-    for (sample = 0; sample <= totalSamples - 1; sample++) {
-      predictions[sample] = 0;
+void forward() {
+  // Dot product of model and weights1
+  for (sample = 0; sample < totalSamples; sample++) {
+    for (layer = 0; layer < HIDDEN_LAYERS; layer++) {
+      activation2[sample][layer] = 0;
 
       for (feature = 0; feature < totalFeatures; feature++) {
-        predictions[sample] += weights[feature] * modelNormals[sample][feature];
-      }
-
-      if (predictions[sample] > labelNormals[sample] - TOLERANCE &&
-          predictions[sample] < labelNormals[sample] + TOLERANCE) {
-        continue;
-      }
-
-      error = 1;
-
-      for (feature = 0; feature < totalFeatures; feature++) {
-        if (labelNormals[sample] - predictions[sample] < 0) {
-          weights[feature] -= alpha * modelNormals[sample][feature];
-        } else {
-          weights[feature] += alpha * modelNormals[sample][feature];
-        }
+        sum = modelNormals[sample][feature] * weights1[feature][layer];
+        activation2[sample][layer] += sum;
       }
     }
   }
+
+  // Sigmoid activation2 for activity2
+  for (sample = 0; sample < totalSamples; sample++) {
+    for (layer = 0; layer < HIDDEN_LAYERS; layer++) {
+      sum = 1 / (1 + pow(M_E, -activation2[sample][layer]));
+      activity2[sample][layer] = sum;
+    }
+  }
+
+  // Dot product of activity2 and weights2
+  for (sample = 0; sample < totalSamples; sample++) {
+    activation3[sample] = 0;
+
+    for (layer = 0; layer < HIDDEN_LAYERS; layer++) {
+      sum = activity2[sample][layer] * weights2[layer];
+      activation3[sample] += sum;
+    }
+  }
+
+  // Sigmoid activation3 for yHat
+  for (sample = 0; sample < totalSamples; sample++) {
+    sum = 1 / (1 + pow(M_E, -activation3[sample]));
+    yHat[sample] = sum;
+  }
 }
 
-void predict() {
-  for (sample = 0; sample <= totalSamples - 1; sample++) {
-    predictions[sample] = 0;
+double costFunction() {
+  forward();
+  sum = 0;
 
-    for (feature = 0; feature < totalFeatures; feature++) {
-      predictions[sample] += weights[feature] * modelNormals[sample][feature];
+  for (sample = 0; sample < totalSamples; sample++) {
+    sum += labelNormals[sample] - yHat[sample];
+  }
+
+  return sum * 0.5;
+}
+
+void costFunctionPrime() {
+  forward();
+
+  // Calculate sigmoid prime of activation 3
+  double temp1[NUM_SAMPLES] = { 0 };
+
+  for (sample = 0; sample < totalSamples; sample++) {
+    sum = pow(M_E, -activation3[sample]) / (1 + pow(M_E, -activation3[sample]));
+    temp1[sample] = sum;
+  }
+
+  // Calculate negative label normals subtract yHat
+  double temp2[NUM_SAMPLES] = { 0 };
+
+  for (sample = 0; sample < totalSamples; sample++) {
+    sum = -(labelNormals[sample] - yHat[sample]);
+    temp2[sample] = sum;
+  }
+
+  // Multiply temp1 and temp2 to find backpropagating error 1
+  for (sample = 0; sample < totalSamples; sample++) {
+    sum = temp1[sample] * temp2[sample];
+    backpropError1[sample] = sum;
+  }
+
+  // Calculate the dot product of activity2 (transpose) and backpropError1
+  for (layer = 0; layer < HIDDEN_LAYERS; layer++) {
+    costWeights2[layer] = 0;
+
+    for (sample = 0; sample < totalSamples; sample++) {
+      sum = activity2[sample][layer] * backpropError1[sample];
+      costWeights2[layer] += sum;
+    }
+  }
+
+  // Calculate the dot product of backpropError1 and weights 2 (transpose)
+  double temp3[NUM_SAMPLES][HIDDEN_LAYERS] = { 0 };
+
+  for (sample = 0; sample < totalSamples; sample++) {
+    for (layer = 0; layer < HIDDEN_LAYERS; layer++) {
+      sum = backpropError1[sample] * weights2[layer];
+      temp3[sample][layer] = sum;
+    }
+  }
+
+  // Calculate the sigmoid prime of activation 2
+  double temp4[NUM_SAMPLES][HIDDEN_LAYERS] = { 0 };
+
+  for (sample = 0; sample < totalSamples; sample++) {
+    for (layer = 0; layer < HIDDEN_LAYERS; layer++) {
+      sum = activation2[sample][layer];
+      temp4[sample][layer] = pow(M_E, -sum) / (1 + pow(M_E, -sum));
+    }
+  }
+
+  // Multiply temp3 and temp4 to find backpropagating error 2
+  for (sample = 0; sample < totalSamples; sample++) {
+    for (layer = 0; layer < HIDDEN_LAYERS; layer++) {
+      sum = temp3[sample][layer] * temp4[sample][layer];
+      backpropError2[sample][layer] = sum;
+    }
+  }
+
+  // Calculate the dot product of model normals (transpose) and backpropError2
+  for (feature = 0; feature < totalFeatures; feature++) {
+    for (layer = 0; layer < HIDDEN_LAYERS; layer++) {
+      costWeights1[feature][layer] = 0;
+
+      for (sample = 0; sample < totalSamples; sample++) {
+        sum = backpropError2[sample][layer] * modelNormals[sample][feature];
+        costWeights1[feature][layer] += sum;
+      }
     }
   }
 }
@@ -96,7 +205,6 @@ int train(double** trainingSamples, char* trainingLabels, int numSamples,
   // Store the labels and the feature values.
   totalSamples = numSamples;
   totalFeatures = numFeatures;
-  totalLabels = numSamples;
 
   for (sample = 0; sample < numSamples; sample++) {
     labels[sample] = trainingLabels[sample];
@@ -108,29 +216,8 @@ int train(double** trainingSamples, char* trainingLabels, int numSamples,
 
   printf("Data stored locally\n");
 
-  for (feature = 0; feature < NUM_FEATURES; feature++) {
-    weights[feature] = ((double) feature / NUM_FEATURES) + 0.1;
-  }
-
-  // Get label and feature max values
-  for (sample = 0; sample < totalSamples; sample++) {
-    if (sample == 0 || labels[sample] > highestLabel) {
-      highestLabel = labels[sample];
-    }
-
-    if (sample == 0 || labels[sample] < lowestLabel) {
-      lowestLabel = labels[sample];
-    }
-
-    for (feature = 0; feature < totalFeatures; feature++) {
-      if (model[sample][feature] > featureCaps[feature]) {
-        featureCaps[feature] = model[sample][feature];
-      }
-    }
-  }
-
   normalise();
-  learn();
+  forward();
 
   return 1;
 }
@@ -144,27 +231,17 @@ char predictLabel(double* sample, int numFeatures) {
   }
 
   normalise();
-  predict();
+  forward();
 
   char prediction;
-  double closestLabelNormal;
-  int hasFoundLabel = 0;
-  double difference = 0;
 
-  for (label = 0; label < totalLabels; label++) {
-    difference = (labelNormals[label] - predictions[0]);
-
-    if (difference < 0) {
-      difference = -difference;
-    }
-
-    if (hasFoundLabel == 0 || closestLabelNormal > difference) {
-      closestLabelNormal = difference;
-      hasFoundLabel = 1;
-      prediction = labels[label];
-    }
+  if (yHat[0] <= 0.25) {
+    prediction = 'a';
+  } else if (yHat[0] <= 0.75) {
+    prediction = 'b';
+  } else {
+    prediction = 'c';
   }
-  // printf("%c %f %f %f %f\n", prediction, predictions[0], labelNormals[0], labelNormals[totalLabels / 2], labelNormals[totalLabels - 1]);
 
   return prediction;
 }
