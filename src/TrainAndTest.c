@@ -41,6 +41,7 @@ static int sample = 0;
 static int feature = 0;
 static int layer = 0;
 static double sum = 0;
+static double temp = 0;
 
 // Normalisation
 void normalise() {
@@ -112,7 +113,8 @@ double costFunction() {
   sum = 0;
 
   for (sample = 0; sample < totalSamples; sample++) {
-    sum += labelNormals[sample] - yHat[sample];
+    temp = labelNormals[sample] - yHat[sample];
+    sum += temp * temp;
   }
 
   return sum * 0.5;
